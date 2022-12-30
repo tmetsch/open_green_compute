@@ -1,0 +1,19 @@
+[general]
+fast_loop=['compute', 'solar']
+slow_loop=['owa']
+timeout=30
+slow_loop_delay=20
+filename='data.csv'
+
+[solar]
+type='power'
+bus='/dev/i2c-0'
+address='0x41'
+expected_amps=1.2
+
+[owa]
+type='weather'
+url='https://api.openweathermap.org/data/2.5/weather'
+lat=52.3676
+long=4.9041
+app_id='Your OpenWeatherMap API key.'
