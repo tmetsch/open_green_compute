@@ -55,7 +55,10 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
             }
             let tmp = power::PowerSensor::new(
                 name.to_string(),
-                sensor_cfg["bus"].as_str().unwrap_or("/dev/i2c-0").to_string(),
+                sensor_cfg["bus"]
+                    .as_str()
+                    .unwrap_or("/dev/i2c-0")
+                    .to_string(),
                 sensor_cfg["address"].as_integer().unwrap_or(64) as u8,
                 sensor_cfg["expected_amps"].as_float().unwrap_or(1.0),
             );
