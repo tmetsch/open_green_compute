@@ -51,7 +51,7 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
                 || !sensor_cfg.contains_key("address")
                 || !sensor_cfg.contains_key("expected_amps")
             {
-                panic!("a power sensor requires the following fields to be set: dev_bus, address, and expected_amps.");
+                panic!("a power sensor requires the following fields to be set: bus, address, and expected_amps.");
             }
             let tmp = power::PowerSensor::new(
                 name.to_string(),
@@ -176,9 +176,9 @@ mod tests {
     use std::fs;
     use std::io::Write;
 
-    const TEST_DATA: &str = "[general]\nfast_loop=[\"foo\",\"dummy\"]\nslow_loop=[\"bar\"]\nfilename=\"test.csv\"\n\n[foo]\ntype=\"power\"\ndev_bus=\"\"\naddress=0x40\nexpected_amps=1.0\n\n[bar]\ntype=\"weather\"\nlat=0.0\nlong=0.0\napp_id=123\nurl=\"localhost\"\n\n[dummy]\ntype=\"na\"\n";
+    const TEST_DATA: &str = "[general]\nfast_loop=[\"foo\",\"dummy\"]\nslow_loop=[\"bar\"]\nfilename=\"test.csv\"\n\n[foo]\ntype=\"power\"\nbus=\"\"\naddress=0x40\nexpected_amps=1.0\n\n[bar]\ntype=\"weather\"\nlat=0.0\nlong=0.0\napp_id=123\nurl=\"localhost\"\n\n[dummy]\ntype=\"na\"\n";
     const FAULTY_DATA: &str = "[general]\nfast_loop=[\"foo\"]\nslow_loop=[\"bar\"]\n\n";
-    const SENSOR_DATA: &str = "[foo]\ntype=\"power\"\ndev_bus=\"\"\naddress=0x40\nexpected_amps=1.0\n\n[bar]\ntype=\"weather\"\nlat=0.0\nlong=0.0\napp_id=123\nurl=\"localhost\"\n";
+    const SENSOR_DATA: &str = "[foo]\ntype=\"power\"\nbus=\"\"\naddress=0x40\nexpected_amps=1.0\n\n[bar]\ntype=\"weather\"\nlat=0.0\nlong=0.0\napp_id=123\nurl=\"localhost\"\n";
     const FAULTY_SENSOR: &str = "[foo]\ntype=\"power\"\n\n[bar]\ntype=\"weather\"\n";
 
     fn setup(filename: &str, data: &str) {
