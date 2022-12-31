@@ -8,7 +8,7 @@ filename='data.csv'
 [solar]
 type='power'
 bus='/dev/i2c-0'
-address='0x41'
+address=64  # 0x40 == 64
 expected_amps=1.2
 
 [owa]
