@@ -3,7 +3,7 @@
 
 **_Note_**: work in progress.
 
-Simple [Rust](https://www.rust-lang.org/) based application to measure (and maybe later control) power inputs (e.g. from a solar panel) and output (e.g. the power used by a [RaspberryPi](https://www.raspberrypi.org/) of [VisionFive 2](https://www.starfivetech.com/en/site/boards) single board computer.
+Simple [Rust](https://www.rust-lang.org/) based application to measure (and maybe later control) power inputs (e.g. from a solar panel) and output (e.g. the power used by a [RaspberryPi](https://www.raspberrypi.org/) of [VisionFive 2](https://www.starfivetech.com/en/site/boards) single board computer. Goal is to see if we can run a single board computer 24/7 on green energy. 
 
 This was initially created to measure the power consumption of a Raspberry Pi 4 which was powered by a battery bank which in turn was powered by a set of solar-panels. It has also been tested with the [RISC-V](https://riscv.org/) based VisionFive 2. 
 
