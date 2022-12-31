@@ -15,6 +15,10 @@ The following block diagram shows the system setup:
 
 ![block diagram](block_diagram.png)
 
+In reality this all looks a bit more boring:
+
+![img.png](open_green_compute.png)
+
 The collected data will look like the table shown below - this data in turn can be used to train a forecasting model that should help build a model based feedback control bases system.
 
 | timestamp | compute_voltage |  compute_current |    compute_power | solar_voltage | solar_current | solar_power | owa_temperature | ... | owa_cloud_coverage |
