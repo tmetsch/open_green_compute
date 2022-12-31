@@ -11,6 +11,10 @@ The power sensors make use of [INA219](https://www.ti.com/product/INA219) based 
 
 Reason for collecting both power and weather data is to better understand the behaviour of the solar panels under various weather conditions. This should enable better forecasting of the amount of power that will be available in near future, given the current weather.
 
+The following block diagram shows the system setup:
+
+![block diagram](block_diagram.png)
+
 ## Configuration
 
 By default, the configuration file is loaded from *defaults.toml*. You can set an environment variable called OGC_CONFIG to load it from any other path.
