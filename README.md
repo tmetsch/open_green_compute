@@ -15,6 +15,14 @@ The following block diagram shows the system setup:
 
 ![block diagram](block_diagram.png)
 
+The collected data will look like the table shown below - this data in turn can be used to train a forecasting model that should help build a model based feedback control bases system.
+
+| timestamp | compute_voltage |  compute_current |    compute_power | solar_voltage | solar_current | solar_power | owa_temperature | ... | owa_cloud_coverage |
+|----------:|----------------:|-----------------:|-----------------:|--------------:|--------------:|------------:|----------------:|:---:|-------------------:|
+|  21:36:58 |           4.708 | 1174.71036585366 | 5563.71951219512 |             0 |             0 |           0 |           11.92 | ... |                 75 |
+|  21:37:02 |           4.724 | 1164.74085365854 | 5502.43902439024 |             0 |             0 |           0 |           11.91 | ... |                 75 | 
+|       ... |             ... |              ... |              ... |           ... |           ... |         ... |             ... | ... |                ... |
+
 ## Configuration
 
 By default, the configuration file is loaded from *defaults.toml*. You can set an environment variable called OGC_CONFIG to load it from any other path.
