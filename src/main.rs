@@ -47,7 +47,7 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
             Some(Box::new(tmp))
         }
         "power" => {
-            if !sensor_cfg.contains_key("dev_bus")
+            if !sensor_cfg.contains_key("bus")
                 || !sensor_cfg.contains_key("address")
                 || !sensor_cfg.contains_key("expected_amps")
             {
@@ -55,7 +55,7 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
             }
             let tmp = power::PowerSensor::new(
                 name.to_string(),
-                sensor_cfg["dev_bus"].as_str().unwrap_or("").to_string(),
+                sensor_cfg["bus"].as_str().unwrap_or("").to_string(),
                 sensor_cfg["address"].as_integer().unwrap_or(0x40) as u8,
                 sensor_cfg["expected_amps"].as_float().unwrap_or(1.0),
             );

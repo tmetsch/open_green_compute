@@ -1,5 +1,5 @@
 [general]
-fast_loop=['compute', 'solar']
+fast_loop=['solar']
 slow_loop=['owa']
 timeout=30
 slow_loop_delay=20
