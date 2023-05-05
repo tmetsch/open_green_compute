@@ -1,5 +1,5 @@
 [general]
-fast_loop=['solar']
+fast_loop=['solar', 'fritz']
 slow_loop=['owa']
 timeout=30
 slow_loop_delay=20
@@ -10,6 +10,13 @@ type='power'
 bus='/dev/i2c-0'
 address=64  # 0x40 == 64
 expected_amps=1.2
+
+[fritz]
+type='fritz'
+url='https://192.168.178.1'
+user='admin'
+password='123'
+ain='112233445566'
 
 [owa]
 type='weather'

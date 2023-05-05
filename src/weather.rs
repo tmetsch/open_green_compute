@@ -127,7 +127,7 @@ impl common::Sensor for WeatherSensor {
 mod tests {
     // Using mockito is not perfect as is spins up a server & hence is more of an integration tests;
     // but works for now w/o to many add on dependencies, so should be easy to replace.
-    use mockito::mock;
+    use mockito;
 
     use crate::common::Sensor;
 
@@ -160,17 +160,19 @@ mod tests {
 
     #[test]
     fn test_measure_for_success() {
-        let _m = mock(
-            "GET",
-            "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
-        )
-        .with_status(200)
-        .with_header("content-type", "application/json")
-        .with_body(TEST_DATA)
-        .create();
+        let mut server = mockito::Server::new();
+        server
+            .mock(
+                "GET",
+                "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(TEST_DATA)
+            .create();
 
         //
-        let url: String = mockito::server_url();
+        let url: String = server.url();
         let sensor = WeatherSensor::new(
             "test".to_string(),
             url.to_owned() + "/data/2.5/weather",
@@ -186,17 +188,19 @@ mod tests {
 
     #[test]
     fn test_measure_for_failure() {
-        let _m = mock(
-            "GET",
-            "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
-        )
-        .with_status(200)
-        .with_header("content-type", "application/json")
-        .with_body("ohno")
-        .create();
+        let mut server = mockito::Server::new();
+        server
+            .mock(
+                "GET",
+                "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("ohno")
+            .create();
 
         // totally faulty data.
-        let url: String = mockito::server_url();
+        let url: String = server.url();
         let sensor = WeatherSensor::new(
             "test".to_string(),
             url.to_owned() + "/data/2.5/weather",
@@ -208,26 +212,28 @@ mod tests {
         assert_eq!(data, vec![-1.0; NAMES.len()]);
 
         // partly faulty data.
-        let _m = mock(
-            "GET",
-            "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
-        )
-        .with_status(200)
-        .with_header("content-type", "application/json")
-        .with_body(FAULTY_DATA)
-        .create();
+        server
+            .mock(
+                "GET",
+                "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(FAULTY_DATA)
+            .create();
         let data: Vec<f64> = sensor.measure();
         assert_eq!(data, vec![-1.0; NAMES.len()]);
 
         // server error
-        let _m = mock(
-            "GET",
-            "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
-        )
-        .with_status(500)
-        .with_header("content-type", "application/json")
-        .with_body("Whoops")
-        .create();
+        server
+            .mock(
+                "GET",
+                "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
+            )
+            .with_status(500)
+            .with_header("content-type", "application/json")
+            .with_body("Whoops")
+            .create();
         let data: Vec<f64> = sensor.measure();
         assert_eq!(data, vec![-1.0; NAMES.len()]);
     }
@@ -261,17 +267,19 @@ mod tests {
 
     #[test]
     fn test_measure_for_sanity() {
-        let _m = mock(
-            "GET",
-            "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
-        )
-        .with_status(200)
-        .with_header("content-type", "application/json")
-        .with_body(TEST_DATA)
-        .create();
+        let mut server = mockito::Server::new();
+        server
+            .mock(
+                "GET",
+                "/data/2.5/weather?lat=0&lon=0&appid=foo&units=metric",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(TEST_DATA)
+            .create();
 
         //
-        let url: String = mockito::server_url();
+        let url: String = server.url();
         let sensor = WeatherSensor::new(
             "test".to_string(),
             url.to_owned() + "/data/2.5/weather",

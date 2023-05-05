@@ -11,6 +11,7 @@ use std::io::Write;
 
 mod common;
 mod config;
+mod fritz;
 mod power;
 mod weather;
 
@@ -61,6 +62,32 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
                     .to_string(),
                 sensor_cfg["address"].as_integer().unwrap_or(64) as u8,
                 sensor_cfg["expected_amps"].as_float().unwrap_or(1.0),
+            );
+            Some(Box::new(tmp))
+        }
+        "fritz" => {
+            if !sensor_cfg.contains_key("url")
+                || !sensor_cfg.contains_key("user")
+                || !sensor_cfg.contains_key("password")
+                || !sensor_cfg.contains_key("ain")
+            {
+                panic!("a fritz-box sensor requires the following fields to be set: url, user, password, and ain.");
+            }
+            let tmp = fritz::FritzSensor::new(
+                name.to_string(),
+                sensor_cfg["url"]
+                    .as_str()
+                    .unwrap_or("https://192.168.178.1")
+                    .to_string(),
+                sensor_cfg["user"].as_str().unwrap_or("admin").to_string(),
+                sensor_cfg["password"]
+                    .as_str()
+                    .unwrap_or("admin")
+                    .to_string(),
+                sensor_cfg["ain"]
+                    .as_str()
+                    .unwrap_or("1122334455")
+                    .to_string(),
             );
             Some(Box::new(tmp))
         }
