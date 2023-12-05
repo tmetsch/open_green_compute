@@ -113,7 +113,7 @@ impl common::Sensor for FritzSensor {
         names
     }
 
-    fn measure(&self) -> Vec<f64> {
+    fn measure(&mut self) -> Vec<f64> {
         match self.get_token() {
             Ok(sid) => {
                 let mut res = Vec::new();
@@ -300,7 +300,7 @@ mod tests {
             .create();
 
         let url: String = server.url();
-        let sensor = FritzSensor::new(
+        let mut sensor = FritzSensor::new(
             "test".to_string(),
             url,
             "foo".to_string(),

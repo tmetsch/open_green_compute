@@ -93,7 +93,7 @@ impl common::Sensor for PowerSensor {
         }
         names
     }
-    fn measure(&self) -> Vec<f64> {
+    fn measure(&mut self) -> Vec<f64> {
         let device = I2cdev::new(self.dev_bus.clone()).unwrap();
         let mut ina = Ina219::new(device, self.address);
         let calibration = (0.04096_f64 / (self.current_lsb * 0.1)).trunc(); // 0.1 = shunt amps

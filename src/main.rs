@@ -11,6 +11,7 @@ use std::io::Write;
 
 mod common;
 mod config;
+mod foxess;
 mod fritz;
 mod power;
 mod weather;
@@ -91,6 +92,37 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
             );
             Some(Box::new(tmp))
         }
+        "foxess" => {
+            if !sensor_cfg.contains_key("user")
+                || !sensor_cfg.contains_key("password")
+                || !sensor_cfg.contains_key("inverter_id")
+                || !sensor_cfg.contains_key("variables")
+                || !sensor_cfg.contains_key("url")
+            {
+                panic!("a FoxESS sensor requires the following fields to be set: url, user, password, inverter_id and variables.");
+            }
+            let variables: Vec<String> = sensor_cfg["variables"]
+                .as_array()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .map(|c| c.to_string())
+                .collect();
+            let tmp = foxess::FoxEssSensor::new(
+                name.to_string(),
+                sensor_cfg["user"].as_str().unwrap_or("foo").to_string(),
+                sensor_cfg["password"].as_str().unwrap_or("bar").to_string(),
+                sensor_cfg["inverter_id"]
+                    .as_str()
+                    .unwrap_or("123")
+                    .to_string(),
+                variables,
+                sensor_cfg["url"]
+                    .as_str()
+                    .unwrap_or("https://www.foxesscloud.com")
+                    .to_string(),
+            );
+            Some(Box::new(tmp))
+        }
         &_ => None,
     }
 }
@@ -129,7 +161,7 @@ fn main() {
     let cfg = config::load_config(&cfg_file);
 
     // figure out the sensors.
-    let sensors = get_sensors(&cfg);
+    let mut sensors = get_sensors(&cfg);
 
     // create CSV file if it does not exists...
     let path = cfg.data["general"]["filename"]
@@ -162,13 +194,13 @@ fn main() {
                 .expect("should be a duration.")
                 .as_secs_f64(),
         );
-        for sensor in &sensors.fast_loop {
+        for sensor in &mut sensors.fast_loop {
             let tmp = sensor.measure();
             val.extend(tmp);
         }
         if j == 0 {
             let mut new_cache: Vec<f64> = Vec::new();
-            for sensor in &sensors.slow_loop {
+            for sensor in &mut sensors.slow_loop {
                 let tmp = sensor.measure();
                 new_cache.extend(tmp);
             }

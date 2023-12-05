@@ -76,7 +76,7 @@ impl common::Sensor for WeatherSensor {
         names
     }
 
-    fn measure(&self) -> Vec<f64> {
+    fn measure(&mut self) -> Vec<f64> {
         // blocking requests are ok, weather doesn't change that often. async prog hence might be overkill.
         let uri: String = format!(
             "{0}?lat={1}&lon={2}&appid={3}&units=metric",
@@ -173,7 +173,7 @@ mod tests {
 
         //
         let url: String = server.url();
-        let sensor = WeatherSensor::new(
+        let mut sensor = WeatherSensor::new(
             "test".to_string(),
             url.to_owned() + "/data/2.5/weather",
             0.0,
@@ -201,7 +201,7 @@ mod tests {
 
         // totally faulty data.
         let url: String = server.url();
-        let sensor = WeatherSensor::new(
+        let mut sensor = WeatherSensor::new(
             "test".to_string(),
             url.to_owned() + "/data/2.5/weather",
             0.0,
@@ -280,7 +280,7 @@ mod tests {
 
         //
         let url: String = server.url();
-        let sensor = WeatherSensor::new(
+        let mut sensor = WeatherSensor::new(
             "test".to_string(),
             url.to_owned() + "/data/2.5/weather",
             0.0,
