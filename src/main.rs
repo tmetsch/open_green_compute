@@ -105,7 +105,7 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
                 .as_array()
                 .unwrap_or(&Vec::new())
                 .iter()
-                .map(|c| c.to_string())
+                .map(|c| c.as_str().to_owned().unwrap().to_string())
                 .collect();
             let tmp = foxess::FoxEssSensor::new(
                 name.to_string(),
