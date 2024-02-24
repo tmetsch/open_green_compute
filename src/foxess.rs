@@ -1,230 +1,138 @@
 use crate::common;
-use chrono::{Datelike, Utc};
 use md5::{Digest, Md5};
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::Read;
 
-pub struct FoxEssSensor {
+pub struct FoxEssOpenAPISensor {
     name: String,
-    user: String,
-    password: String,
+    api_key: String,
     inverter_id: String,
     variables: Vec<String>,
     url: String,
     client: reqwest::blocking::Client,
-    token: String,
-}
-
-#[derive(Deserialize)]
-struct TokenInfo {
-    token: String,
-}
-
-#[derive(Deserialize)]
-struct TokenResponse {
-    errno: usize,
-    result: TokenInfo,
-}
-
-#[derive(Deserialize)]
-struct TokenTestResponse {
-    errno: usize,
 }
 
 #[derive(Serialize)]
-struct BeginDate {
-    year: i32,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-}
-
-#[derive(Serialize)]
-struct RequestParameter {
-    #[serde(rename = "deviceId")]
-    device_id: String,
+struct DataRequest {
+    #[serde(rename = "sn")]
+    serial_number: String,
     variables: Vec<String>,
-    timespan: String,
-    #[serde(rename = "BeginDate")]
-    begin_date: BeginDate,
 }
-
 #[derive(Deserialize)]
-struct SeriesEntry {
-    // omitting time: String for now.
+struct DataEntry {
+    // omitting unit & name for now.
+    variable: String,
     value: f64,
 }
 
 #[derive(Deserialize)]
-struct DataSeries {
-    variable: String,
-    // omitting for now name: String, FIXME: add this to verify order is always correct!
-    data: Vec<SeriesEntry>,
+struct ResultSet {
+    #[serde(rename = "datas")]
+    data: Vec<DataEntry>,
 }
 
 #[derive(Deserialize)]
 struct DataResponse {
     errno: usize,
-    result: Vec<DataSeries>,
+    result: Vec<ResultSet>,
 }
 
-impl FoxEssSensor {
+impl FoxEssOpenAPISensor {
     pub fn new(
         name: String,
-        user: String,
-        password: String,
+        api_key: String,
         inverter_id: String,
         variables: Vec<String>,
         url: String,
-    ) -> FoxEssSensor {
+    ) -> FoxEssOpenAPISensor {
         let builder: reqwest::blocking::ClientBuilder = reqwest::blocking::ClientBuilder::new();
         let client = builder.danger_accept_invalid_certs(true).build().unwrap();
-        FoxEssSensor {
+        FoxEssOpenAPISensor {
             name,
-            user,
-            password,
+            api_key,
             inverter_id,
             variables,
             url,
             client,
-            token: "n/a".to_string(),
         }
     }
 
-    fn get_token(&self) -> Result<String, Box<dyn Error>> {
-        let url = format!("{}/c/v0/user/login", self.url);
-        // hash the password and try to get a token...
-        let tmp = Md5::digest(self.password.as_bytes());
-        let body = format!("user={}&password={:x}", self.user, tmp);
-        let mut response = self
-            .client
-            .post(url)
-            .header("User-Agent", "")
-            .body(body)
-            .send()?;
-        if response.status() != 200 {
-            return Err(Box::try_from(format!(
-                "Status code was not 200; but: {}.",
-                response.status()
-            ))
-            .unwrap());
-        }
+    pub fn do_query(&self, path: &str, token: &str) -> Result<Vec<f64>, Box<dyn Error>> {
+        let url = format!("{}{}", self.url, path);
 
-        // parse the result...
-        let mut body: String = String::new();
-        response.read_to_string(&mut body)?;
-        let doc: TokenResponse = serde_json::from_str(&body)?;
+        // create signature
+        let timestamp = std::time::UNIX_EPOCH.elapsed().unwrap().as_millis();
+        let signature_string = format!(r"{}\r\n{}\r\n{}", path, token, timestamp);
+        let signature = format!("{:x}", Md5::digest(signature_string.as_bytes()));
 
-        // wrong credentials will lead to a non zero err code from the api.
-        if doc.errno != 0 {
-            return Err(
-                Box::try_from(format!("Error code was not 0; but: {}.", doc.errno)).unwrap(),
-            );
-        }
-        Ok(doc.result.token)
-    }
+        // headers
+        let mut headers = HeaderMap::new();
+        // TODO: error handling.
+        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+        headers.insert("token", HeaderValue::from_str(token).unwrap());
+        headers.insert("signature", HeaderValue::from_str(&signature).unwrap());
+        headers.insert(
+            "timestamp",
+            HeaderValue::from_str(&timestamp.to_string()).unwrap(),
+        );
+        headers.insert("Lang", HeaderValue::from_static("en"));
 
-    fn test_token(&self, token: &str) -> Result<bool, Box<dyn Error>> {
-        let url = format!("{}/c/v0/device/status/all", self.url);
-        let mut response = self
-            .client
-            .get(url)
-            .header("User-Agent", "")
-            .header("token", token)
-            .send()?;
-        if response.status() != 200 {
-            return Err(Box::try_from(format!(
-                "Status code was not 200; but: {}.",
-                response.status()
-            ))
-            .unwrap());
-        }
-
-        // parse the result...
-        let mut body: String = String::new();
-        response.read_to_string(&mut body)?;
-        let doc: TokenTestResponse = serde_json::from_str(&body)?;
-
-        // wrong credentials will lead to a non zero err code from the api.
-        if doc.errno != 0 {
-            return Err(
-                Box::try_from(format!("Error code was not 0; but: {}.", doc.errno)).unwrap(),
-            );
-        }
-        Ok(true)
-    }
-
-    fn do_query(&self, token: &str) -> Result<Vec<f64>, Box<dyn Error>> {
-        let url = format!("{}/c/v0/device/history/raw", self.url);
-        let now = Utc::now();
-        let request_parameter = RequestParameter {
-            device_id: self.inverter_id.clone(),
+        // payload
+        let data_req = DataRequest {
+            serial_number: self.inverter_id.clone(),
             variables: self.variables.clone(),
-            timespan: "day".to_string(),
-            begin_date: BeginDate {
-                year: now.year(),
-                month: now.month(),
-                day: now.day(),
-                hour: 0,
-                minute: 0,
-                second: 0,
-            },
         };
+
+        // post request
         let mut response = self
             .client
             .post(url)
-            .json(&request_parameter)
-            .header("token", token)
-            .header("User-Agent", "")
+            .headers(headers)
+            .json(&data_req)
             .send()?;
-
         if response.status() != 200 {
-            return Err(Box::try_from(format!(
+            return Err(Box::from(format!(
                 "Status code was not 200; but: {}.",
                 response.status()
-            ))
-            .unwrap());
+            )));
         }
 
         // parse the result...
         let mut body: String = String::new();
         response.read_to_string(&mut body)?;
         let doc: DataResponse = serde_json::from_str(&body)?;
-
         if doc.errno != 0 {
-            return Err(
-                Box::try_from(format!("Error code was not 0; but: {}.", doc.errno)).unwrap(),
-            );
+            return Err(Box::from(format!(
+                "Error code was not 0; but: {}.",
+                doc.errno
+            )));
         }
 
-        // result is order; first one we asked for is the first one we should get...
-        if doc.result.len() != self.variables.len() {
-            return Err(Box::try_from(
+        // we ask for 1 inverter atm; expect equal amount of elements to be returned as we request.
+        if doc.result.len() != 1 || doc.result[0].data.len() != self.variables.len() {
+            return Err(Box::from(
                 "Number of data entries does not match number of requested entries.",
-            )
-            .unwrap());
+            ));
         }
+
         let mut res = Vec::new();
-        for series in doc.result {
-            // pick the last measurement - as FoxESS raw data is "old" anyhow this seems to be the best we can do.
-            if series.data.is_empty() {
-                return Err(Box::try_from(format!(
-                    "Expected at least one value for the series: {}; length is: {}.",
-                    series.variable,
-                    series.data.len()
-                ))
-                .unwrap());
+        for (i, data_entry) in doc.result[0].data.iter().enumerate() {
+            if data_entry.variable != self.variables[i] {
+                // result is ordered; first one we asked for is the first one we should get...
+                return Err(Box::from(format!(
+                    "Expected variable {} got {}.",
+                    self.variables[i], data_entry.variable,
+                )));
             }
-            res.push(series.data.last().unwrap().value);
+            res.push(data_entry.value);
         }
         Ok(res)
     }
 }
 
-impl common::Sensor for FoxEssSensor {
+impl common::Sensor for FoxEssOpenAPISensor {
     fn get_names(&self) -> Vec<String> {
         let mut names: Vec<String> = Vec::new();
         for metric in self.variables.iter() {
@@ -234,33 +142,10 @@ impl common::Sensor for FoxEssSensor {
     }
 
     fn measure(&mut self) -> Vec<f64> {
-        if self.token == "n/a" {
-            self.token = match self.get_token() {
-                Ok(res) => res,
-                Err(err) => {
-                    println!("Could not retrieve a valid token: {}.", err);
-                    return vec![-1.0; self.variables.len()];
-                }
-            };
-        } else {
-            match self.test_token(&self.token) {
-                Ok(_) => {}
-                Err(_) => {
-                    self.token = match self.get_token() {
-                        Ok(res) => res,
-                        Err(err) => {
-                            println!("Could not retrieve a valid token: {}.", err);
-                            return vec![-1.0; self.variables.len()];
-                        }
-                    };
-                }
-            }
-        }
-
-        match self.do_query(&self.token) {
+        match self.do_query("/op/v0/device/real/query", &self.api_key) {
             Ok(res) => res,
             Err(err) => {
-                println!("Could not retrieve values: {}.", err);
+                println!("Could not retrieve values: {}", err);
                 vec![-1.0; self.variables.len()]
             }
         }
@@ -276,223 +161,84 @@ mod tests {
     // Tests for success.
 
     // Tests for failure.
-
-    #[test]
-    fn test_measure_for_failure() {
-        let mut server = mockito::Server::new();
-        let url: String = server.url();
-
-        // token - errno not 0.
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 1, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        let mut sensor = FoxEssSensor::new(
-            "fox0".to_string(),
-            "foo".to_string(),
-            "bar".to_string(),
-            "".to_string(),
-            vec!["foo".to_string(), "bar".to_string()],
-            url,
-        );
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-
-        // token - status code not 200.
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(403)
-            .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-
-        // token ok - retrieving raw data returns errno no 0.
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(500)
-            .with_body("{}")
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-
-        // token ok - retrieving raw data returns some non 200 status code.
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(200)
-            .with_body("{\"errno\": 40000, \"result\": []}")
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-
-        // token ok - retrieving raw data return corrupt data series.
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": [\
-                {\"variable\":\"foo\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[{\"time\":\"2023-11-24 18:02:00 CET+0100\",\"value\":0.1},{\"time\":\"2023-11-24 18:06:30 CET+0100\",\"value\":0.5}]}\
-                ]}",
-            )
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-
-        // token ok - retrieving raw data return corrupt data series.
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": [\
-                {\"variable\":\"foo\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[]},\
-                {\"variable\":\"bar\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[]}\
-                ]}",
-            )
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-        assert_eq!(sensor.token, "abc");
-
-        // we'll let test token fail.
-        server
-            .mock("GET", "/c/v0/device/status/all")
-            .with_status(200)
-            .with_body("{\"errno\": 40000}")
-            .create();
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"xyz\", \"user\": \"foo\", \"access\": 1}}",
-            )
-            .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": [\
-                {\"variable\":\"foo\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[]},\
-                {\"variable\":\"bar\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[]}\
-                ]}",
-            )
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
-        assert_eq!(sensor.token, "xyz");
-
-        // we'll let test token fail.
-        server
-            .mock("GET", "/c/v0/device/status/all")
-            .with_status(200)
-            .with_body("{\"errno\": 40000}")
-            .create();
-        server
-            .mock("POST", "/c/v0/user/login")
-            .with_status(200)
-            .with_body("{\"errno\": 40000, \"result\": {\"token\": \"\"}}")
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![-1.0, -1.0]);
+    macro_rules! test_for_failure {
+        ($name:ident, $($status:expr, $body:expr, $expected:expr),+) => {
+            #[test]
+            fn $name() {
+                $(
+                    let mut server = mockito::Server::new();
+                    let url: String = server.url();
+                    server
+                        .mock("POST", "/op/v0/device/real/query")
+                        .with_status($status)
+                        .with_body($body)
+                        .create();
+                    let mut sensor = FoxEssOpenAPISensor::new(
+                        "fox0".to_string(),
+                        "123".to_string(),
+                        "abc".to_string(),
+                        vec!["foo".to_string(), "bar".to_string()],
+                        url,
+                    );
+                    let data: Vec<f64> = sensor.measure();
+                    assert_eq!(data, $expected);
+                )*
+            }
+        }
     }
+
+    test_for_failure!(status_not_ok, 406, "", vec![-1.0, -1.0]);
+    test_for_failure!(
+        errno_not_zero,
+        200,
+        "{\"errno\": 1, \"result\": []}",
+        vec![-1.0, -1.0]
+    );
+    test_for_failure!(wrong_order, 200, "{\"errno\": 0, \"result\": [{\"datas\": [{\"variable\": \"bar\", \"value\": 0.5},{\"variable\": \"foo\", \"value\": 0.5}]}]}", vec![-1.0, -1.0]);
+    test_for_failure!(
+        missing_variable,
+        200,
+        "{\"errno\": 0, \"result\": [{\"datas\": [{\"variable\": \"foo\", \"value\": 0.5}]}]}",
+        vec![-1.0, -1.0]
+    );
 
     // Tests for sanity.
 
     #[test]
     fn test_get_names_for_sanity() {
-        let sensor = FoxEssSensor::new(
+        let sensor = FoxEssOpenAPISensor::new(
             "fox0".to_string(),
-            "foo".to_string(),
-            "bar".to_string(),
-            "".to_string(),
+            "123".to_string(),
+            "abc".to_string(),
             vec!["foo".to_string(), "bar".to_string()],
             "".to_string(),
         );
         let data: Vec<String> = sensor.get_names();
         assert_eq!(data, vec!["fox0_foo", "fox0_bar"]);
     }
+
     #[test]
     fn test_measure_for_sanity() {
         let mut server = mockito::Server::new();
         let url: String = server.url();
         server
-            .mock("POST", "/c/v0/user/login")
+            .mock("POST", "/op/v0/device/real/query")
             .with_status(200)
             .with_body(
-                "{\"errno\": 0, \"result\": {\"token\": \"abc\", \"user\": \"foo\", \"access\": 1}}",
+                "{\"errno\": 0, \"msg\": \"success\", \"result\": [{\"datas\": [\
+                {\"unit\": \"kW\", \"name\": \"Blah\", \"variable\": \"foo\", \"value\": 0.5},\
+                {\"unit\": \"kW\", \"name\": \"Blub\", \"variable\": \"bar\", \"value\": 0.4}],\
+                \"time\": \"2024-02-21 12:34:36 CET+0100\", \"deviceSN\": \"abc\"}]}",
             )
             .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": [\
-                {\"variable\":\"foo\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[{\"time\":\"2023-11-24 18:02:00 CET+0100\",\"value\":0.1},{\"time\":\"2023-11-24 18:06:30 CET+0100\",\"value\":0.5}]},\
-                {\"variable\":\"bar\",\"unit\":\"kW\",\"name\":\"Bar Power\",\"data\":[{\"time\":\"2023-11-24 18:02:00 CET+0100\",\"value\":0.4}]}\
-                ]}",
-            )
-            .create();
-        let mut sensor = FoxEssSensor::new(
+        let mut sensor = FoxEssOpenAPISensor::new(
             "fox0".to_string(),
-            "foo".to_string(),
-            "bar".to_string(),
-            "".to_string(),
+            "123".to_string(),
+            "abc!".to_string(),
             vec!["foo".to_string(), "bar".to_string()],
             url,
         );
         let data: Vec<f64> = sensor.measure();
         assert_eq!(data, vec![0.5, 0.4]);
-        assert_eq!(sensor.token, "abc");
-
-        // this time we reuse a token.
-        server
-            .mock("GET", "/c/v0/device/status/all")
-            .with_status(200)
-            .with_body("{\"errno\": 0}")
-            .create();
-        server
-            .mock("POST", "/c/v0/device/history/raw")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"result\": [\
-                {\"variable\":\"foo\",\"unit\":\"kW\",\"name\":\"Foo Power\",\"data\":[{\"time\":\"2023-11-24 18:02:00 CET+0100\",\"value\":0.1},{\"time\":\"2023-11-24 18:06:30 CET+0100\",\"value\":0.8}]},\
-                {\"variable\":\"bar\",\"unit\":\"kW\",\"name\":\"Bar Power\",\"data\":[{\"time\":\"2023-11-24 18:02:00 CET+0100\",\"value\":0.7}]}\
-                ]}",
-            )
-            .create();
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![0.8, 0.7]);
     }
 }

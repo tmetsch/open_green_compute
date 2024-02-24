@@ -50,9 +50,9 @@ impl FritzSensor {
         let url = format!("{}/login_sid.lua", self.url);
         let mut res = self.client.get(url).send()?;
         if res.status() != 200 {
-            return Err(
-                Box::try_from("Status code was not 200 when retrieving the challenge.").unwrap(),
-            );
+            return Err(Box::from(
+                "Status code was not 200 when retrieving the challenge.",
+            ));
         }
         let mut body: String = String::new();
         res.read_to_string(&mut body)?;
@@ -75,7 +75,9 @@ impl FritzSensor {
         );
         let mut res = self.client.get(query).send()?;
         if res.status() != 200 {
-            return Err(Box::try_from("Status code was not 200 when retrieving the SID.").unwrap());
+            return Err(Box::from(
+                "Status code was not 200 when retrieving the SID.",
+            ));
         }
         let mut body: String = String::new();
         res.read_to_string(&mut body)?;
@@ -91,11 +93,10 @@ impl FritzSensor {
         );
         let mut res = self.client.get(query).send()?;
         if res.status() != 200 {
-            return Err(Box::try_from(format!(
+            return Err(Box::from(format!(
                 "Status code was not 200 when retrieving data for: {}",
                 command
-            ))
-            .unwrap());
+            )));
         }
         let mut body: String = String::new();
         res.read_to_string(&mut body)?;

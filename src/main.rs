@@ -93,13 +93,11 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
             Some(Box::new(tmp))
         }
         "foxess" => {
-            if !sensor_cfg.contains_key("user")
-                || !sensor_cfg.contains_key("password")
+            if !sensor_cfg.contains_key("api_key")
                 || !sensor_cfg.contains_key("inverter_id")
                 || !sensor_cfg.contains_key("variables")
-                || !sensor_cfg.contains_key("url")
             {
-                panic!("a FoxESS sensor requires the following fields to be set: url, user, password, inverter_id and variables.");
+                panic!("a FoxESS sensor requires the following fields to be set: api_key, inverter_id, variables.");
             }
             let variables: Vec<String> = sensor_cfg["variables"]
                 .as_array()
@@ -107,10 +105,10 @@ fn create_sensor(name: &str, sensor_cfg: &toml::value::Table) -> Option<Box<dyn 
                 .iter()
                 .map(|c| c.as_str().to_owned().unwrap().to_string())
                 .collect();
-            let tmp = foxess::FoxEssSensor::new(
+
+            let tmp = foxess::FoxEssOpenAPISensor::new(
                 name.to_string(),
-                sensor_cfg["user"].as_str().unwrap_or("foo").to_string(),
-                sensor_cfg["password"].as_str().unwrap_or("bar").to_string(),
+                sensor_cfg["api_key"].as_str().unwrap_or("bar").to_string(),
                 sensor_cfg["inverter_id"]
                     .as_str()
                     .unwrap_or("123")
@@ -216,7 +214,6 @@ fn main() {
             j = 0;
         }
         let mut file = fs::OpenOptions::new()
-            .write(true)
             .append(true)
             .open(path)
             .expect("could not open file for appending data.");
