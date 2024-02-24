@@ -69,7 +69,6 @@ impl FoxEssOpenAPISensor {
 
         // headers
         let mut headers = HeaderMap::new();
-        // TODO: error handling.
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("token", HeaderValue::from_str(token).unwrap());
         headers.insert("signature", HeaderValue::from_str(&signature).unwrap());
@@ -157,10 +156,7 @@ mod tests {
     use super::*;
     use crate::common::Sensor;
 
-    // Tests for success.
-
-    // Tests for failure.
-    macro_rules! test_for_failure {
+    macro_rules! test_post_request {
         ($name:ident, $($status:expr, $body:expr, $expected:expr),+) => {
             #[test]
             fn $name() {
@@ -186,15 +182,19 @@ mod tests {
         }
     }
 
-    test_for_failure!(status_not_ok, 406, "", vec![-1.0, -1.0]);
-    test_for_failure!(
+    // Tests for success.
+
+    // Tests for failure.
+
+    test_post_request!(status_not_ok, 406, "", vec![-1.0, -1.0]);
+    test_post_request!(
         errno_not_zero,
         200,
         "{\"errno\": 1, \"result\": []}",
         vec![-1.0, -1.0]
     );
-    test_for_failure!(wrong_order, 200, "{\"errno\": 0, \"result\": [{\"datas\": [{\"variable\": \"bar\", \"value\": 0.5},{\"variable\": \"foo\", \"value\": 0.5}]}]}", vec![-1.0, -1.0]);
-    test_for_failure!(
+    test_post_request!(wrong_order, 200, "{\"errno\": 0, \"result\": [{\"datas\": [{\"variable\": \"bar\", \"value\": 0.5},{\"variable\": \"foo\", \"value\": 0.5}]}]}", vec![-1.0, -1.0]);
+    test_post_request!(
         missing_variable,
         200,
         "{\"errno\": 0, \"result\": [{\"datas\": [{\"variable\": \"foo\", \"value\": 0.5}]}]}",
@@ -216,28 +216,13 @@ mod tests {
         assert_eq!(data, vec!["fox0_foo", "fox0_bar"]);
     }
 
-    #[test]
-    fn test_measure_for_sanity() {
-        let mut server = mockito::Server::new();
-        let url: String = server.url();
-        server
-            .mock("POST", "/op/v0/device/real/query")
-            .with_status(200)
-            .with_body(
-                "{\"errno\": 0, \"msg\": \"success\", \"result\": [{\"datas\": [\
+    test_post_request!(
+        sanity_check,
+        200,
+        "{\"errno\": 0, \"msg\": \"success\", \"result\": [{\"datas\": [\
                 {\"unit\": \"kW\", \"name\": \"Blah\", \"variable\": \"foo\", \"value\": 0.5},\
                 {\"unit\": \"kW\", \"name\": \"Blub\", \"variable\": \"bar\", \"value\": 0.4}],\
                 \"time\": \"2024-02-21 12:34:36 CET+0100\", \"deviceSN\": \"abc\"}]}",
-            )
-            .create();
-        let sensor = FoxEssOpenAPISensor::new(
-            "fox0".to_string(),
-            "123".to_string(),
-            "abc!".to_string(),
-            vec!["foo".to_string(), "bar".to_string()],
-            url,
-        );
-        let data: Vec<f64> = sensor.measure();
-        assert_eq!(data, vec![0.5, 0.4]);
-    }
+        vec![0.5, 0.4]
+    );
 }
