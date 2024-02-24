@@ -114,7 +114,7 @@ impl common::Sensor for FritzSensor {
         names
     }
 
-    fn measure(&mut self) -> Vec<f64> {
+    fn measure(&self) -> Vec<f64> {
         match self.get_token() {
             Ok(sid) => {
                 let mut res = Vec::new();
@@ -140,8 +140,6 @@ impl common::Sensor for FritzSensor {
 
 #[cfg(test)]
 mod tests {
-    use mockito;
-
     use crate::common::Sensor;
 
     use super::*;
@@ -301,7 +299,7 @@ mod tests {
             .create();
 
         let url: String = server.url();
-        let mut sensor = FritzSensor::new(
+        let sensor = FritzSensor::new(
             "test".to_string(),
             url,
             "foo".to_string(),

@@ -232,8 +232,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::io::Write;
 
     const TEST_DATA: &str = "[general]\nfast_loop=[\"foo\",\"dummy\"]\nslow_loop=[\"bar\"]\nfilename=\"test.csv\"\n\n[foo]\ntype=\"power\"\nbus=\"\"\naddress=0x40\nexpected_amps=1.0\n\n[bar]\ntype=\"weather\"\nlat=0.0\nlong=0.0\napp_id=123\nurl=\"localhost\"\n\n[dummy]\ntype=\"na\"\n";
     const FAULTY_DATA: &str = "[general]\nfast_loop=[\"foo\"]\nslow_loop=[\"bar\"]\n\n";

@@ -141,7 +141,7 @@ impl common::Sensor for FoxEssOpenAPISensor {
         names
     }
 
-    fn measure(&mut self) -> Vec<f64> {
+    fn measure(&self) -> Vec<f64> {
         match self.do_query("/op/v0/device/real/query", &self.api_key) {
             Ok(res) => res,
             Err(err) => {
@@ -156,7 +156,6 @@ impl common::Sensor for FoxEssOpenAPISensor {
 mod tests {
     use super::*;
     use crate::common::Sensor;
-    use mockito;
 
     // Tests for success.
 
@@ -173,7 +172,7 @@ mod tests {
                         .with_status($status)
                         .with_body($body)
                         .create();
-                    let mut sensor = FoxEssOpenAPISensor::new(
+                    let sensor = FoxEssOpenAPISensor::new(
                         "fox0".to_string(),
                         "123".to_string(),
                         "abc".to_string(),
@@ -231,7 +230,7 @@ mod tests {
                 \"time\": \"2024-02-21 12:34:36 CET+0100\", \"deviceSN\": \"abc\"}]}",
             )
             .create();
-        let mut sensor = FoxEssOpenAPISensor::new(
+        let sensor = FoxEssOpenAPISensor::new(
             "fox0".to_string(),
             "123".to_string(),
             "abc!".to_string(),
